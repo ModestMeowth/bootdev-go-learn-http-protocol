@@ -1,10 +1,11 @@
 package main
 
 import (
+    "errors"
     "fmt"
     "log"
     "io"
-    "os"
+    "net"
     "strings"
 )
 
@@ -12,9 +13,13 @@ const inputFilePath = "messages.txt"
 
 func getLinesChannel(f io.ReadCloser) <-chan string {
     c := make(chan string)
-    var current string
 
     go func() {
+        defer f.Close()
+        defer close(c)
+
+        current := ""
+
         for {
             buffer := make([]byte, 8, 8)
 
@@ -22,41 +27,48 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
             if err != nil {
                 if current != "" {
                     c <- current
-                    current = ""
                 }
-                break
+                if errors.Is(err, io.EOF) {
+                    break
+                }
+
+                fmt.Printf("error: %s\n", err.Error())
+                return
             }
 
             str := string(buffer[:n])
             parts := strings.Split(str, "\n")
 
             for i := 0; i < len(parts)-1; i++ {
-                c <- current + parts[i]
+                c <- fmt.Sprintf("%s%s", current, parts[i])
                 current = ""
             }
 
             current += parts[len(parts)-1]
         }
-        close(c)
     }()
 
     return c
 }
 
 func main() {
-    f,err := os.Open(inputFilePath)
+    l,err := net.Listen("tcp", ":42069")
     if err != nil {
-        log.Fatalf("Could not open %s: %s\n", inputFilePath, err)
+        log.Fatalf("error: %s\n", err)
     }
-    defer f.Close()
+    defer l.Close()
 
+    for {
+        conn, err := l.Accept()
+        if err != nil {
+            log.Fatalf("error: %s\n", err)
+        }
+        fmt.Println("connection accepted")
 
-    fmt.Printf("Reading data from %s\n", inputFilePath)
-    fmt.Println("=====================================")
+        c := getLinesChannel(conn)
 
-    c := getLinesChannel(f)
-
-    for line := range c {
-        fmt.Printf("read: %s\n", line)
+        for line := range c {
+            fmt.Printf("read: %s\n", line)
+        }
     }
 }
