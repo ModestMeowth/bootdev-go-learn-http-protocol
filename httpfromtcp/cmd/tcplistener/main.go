@@ -8,7 +8,7 @@ import (
 	"net"
 	"strings"
 
-    "github.com/ModestMeowth/bootdev-go-learn-http-protocol/internal/request/request"
+    "github.com/ModestMeowth/bootdev-go-learn-http-protocol/internal/request"
 )
 
 const port = "127.0.0.1:42069"
